@@ -20,20 +20,19 @@ Please note that this script is currently under development, and I cannot provid
 - [License](#license)
 
 # Features
-- Asynchronous processing for handling multiple KML files efficiently.
-- Merging of up to 10 KML files into a single visualization.
-- Each KML file is represented in a unique color for easy differentiation.
-- Logging: Logs activities both to a file and the console.
-- Metadata extraction: File creation, modification time, and SHA-256 hash for integrity verification.
-- Saves analysis results and maps in various formats (Excel, HTML).
-- Enhanced user interaction and error handling.
+- Synchronous processing for enhanced compatibility and reliability when handling multiple KML files.
+- Merging of up to 10 KML files into a single visualization, with a limit to ensure performance and manageability.
+- Unique color coding for each KML file to facilitate easy differentiation in the merged visualization.
+- Comprehensive logging: Logs activities in detail to a file, with warnings and errors also displayed in the console.
+- Metadata extraction: Includes file creation and modification times, along with SHA-256 hash for integrity verification.
+- Saves results and maps in multiple formats, including KML, Excel, CSV, and HTML for thorough analysis and documentation.
+- Improved user interaction and error handling, with clear prompts and robust validation to prevent and manage errors effectively.
 
 # Requirements
 - Python 3.7 or higher
    - The following Python packages:
    - pandas>=2.0.0,<3.0.0
    - lxml>=4.9.0,<5.0.0
-   - aiofiles>=23.1.0,<24.0.0
    - plotly>=5.15.0,<6.0.0
    - python-dateutil>=2.8.0,<3.0.0
    - arrow>=1.0.0,<2.0.0
