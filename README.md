@@ -4,7 +4,7 @@ UFEDKMLstacker is a Python script designed to merge and visualize KML files expo
 > [!NOTE]
 > This script is specifically tailored for KML files exported from Cellebrite UFED. Its compatibility or performance with KML files from other sources has not been tested.
 
-> [!WARNING]
+> [!CAUTION]
 Please note that this script is currently under development, and I cannot provide a 100% guarantee that it operates in a forensically sound manner. It is tailored to meet specific needs at this stage. Use it with caution, especially in environments where forensic integrity is critical.
 
 ## Table of Contents
