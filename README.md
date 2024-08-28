@@ -4,6 +4,9 @@ UFEDKMLstacker is a Python script designed to merge and visualize KML files expo
 > [!NOTE]
 > This script is specifically tailored for KML files exported from Cellebrite UFED. Its compatibility or performance with KML files from other sources has not been tested.
 
+> [!WARNING]
+Please note that this script is currently under development, and I cannot provide a 100% guarantee that it operates in a forensically sound manner. It is tailored to meet specific needs at this stage. Use it with caution, especially in environments where forensic integrity is critical.
+
 ## Table of Contents
 - [Features](#features)
 - [Requirements](#requirements)
@@ -28,10 +31,12 @@ UFEDKMLstacker is a Python script designed to merge and visualize KML files expo
 # Requirements
 - Python 3.7 or higher
    - The following Python packages:
-   - pandas>=1.3.0,<1.4.0
-   - lxml>=4.6.3,<5.0.0
-   - aiofiles>=0.7.0,<0.8.0
-   - plotly>=5.3.0,<6.0.0
+   - pandas>=2.0.0,<3.0.0
+   - lxml>=4.9.0,<5.0.0
+   - aiofiles>=23.1.0,<24.0.0
+   - plotly>=5.15.0,<6.0.0
+   - python-dateutil>=2.8.0,<3.0.0
+   - arrow>=1.0.0,<2.0.0
 
 # Installation
 1. **Clone the repository**
@@ -96,7 +101,8 @@ A compiled and 7zip-packed version of UFEDKMLstacker for Windows is available as
    2. Example2.kml
    3. Example3.kml
    e. Exit
-   Enter the numbers of the desired KML files to merge (e.g., 1,2,3) or 'e' to exit:
+   
+   Enter file numbers to merge (e.g., 1, 2, 5) or 'e' to exit:
    ```
 
 ## After selecting files, the script prompts for remarks
@@ -108,12 +114,27 @@ A compiled and 7zip-packed version of UFEDKMLstacker for Windows is available as
 
 ## The interactive map is then generated and saved
    ```sh
-   Process completed successfully. Details are available in the log and Excel file.
+   Statistics saved in C:\YOUR\PATH\TO\UFEDKMLstacker\KML_Statistics.xlsx.
+   Statistics saved in C:\YOUR\PATH\TO\UFEDKMLstacker\KML_Statistics.csv.
+
+   Process completed successfully. Details are available in the log, Excel file, and CSV file.
    ```
 
 ___
 
 # Changes
+
+## Changes in 0.0.2
+
+- **Synchronous Processing**<br>The script has been updated from asynchronous to synchronous processing to enhance compatibility and reliability. The use of asyncio and aiofiles has been removed.
+- **File Selection Limitation**<br>A new feature limits the selection to a maximum of 10 KML files at a time. This constraint ensures that the script processes only a manageable number of files simultaneously.
+- **Enhanced Error Handling**<br>Improved error handling mechanisms have been introduced to catch and log specific exceptions such as FileNotFoundError, ValueError, and XMLSyntaxError more effectively.
+- **Input Validation**<br>Additional validation steps have been implemented to ensure that user inputs are correct, avoiding invalid characters or excessively long entries.
+- **Extended Timestamp Processing**<br>The timestamp parsing has been extended to support more formats, ensuring that various timestamp formats can be recognized and parsed correctly.
+- **Saving Statistics**<br>Separate Excel and CSV files (KML_Statistic.xlsx and KML_Statistic.csv) have been introduced to store detailed statistics about the processed KML files. This adds an extra layer of control and documentation, complementing the existing Merged_Colored files.
+- **Logging Configuration**<br>Logging settings have been optimized to provide a logical separation between console and file logging. Console logging now only displays messages at the WARNING level and above, while detailed debug information is still recorded in the log file.
+
+These changes improve the script's usability, robustness, and traceability, providing more comprehensive tools for the forensic analysis of geospatial data.
 
 ## Changes in 0.0.1
 - Initial release.
