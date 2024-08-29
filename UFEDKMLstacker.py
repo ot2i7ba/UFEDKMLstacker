@@ -57,7 +57,7 @@ def spinner(stop_event, task_name, lock):
             sys.stdout.flush()
         time.sleep(0.1)
 
-def configure_logging(log_to_console=False):
+def configure_logging(log_to_console=True):
     """
     Configure logging to log to both the console and a file with rotation.
     The console will only show ERROR level and above, while the log file will capture DEBUG level and above.
