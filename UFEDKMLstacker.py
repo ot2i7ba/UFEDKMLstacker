@@ -9,21 +9,23 @@ Stack (merge) multiple KML files to generate a combined interactive map using Pl
 
 # Standard Libraries
 import hashlib
+import itertools
 import logging
-from logging.handlers import RotatingFileHandler
 import os
 import re
 import subprocess
 import sys
+import threading
 import time
 from datetime import datetime, timedelta, timezone
+from logging.handlers import RotatingFileHandler
 from typing import Any, Dict, List, Tuple
 
 # Third-party Libraries
+import arrow
 import pandas as pd
 import plotly.express as px
 from lxml import etree
-import arrow
 
 # Determine the base path based on whether the script is frozen (compiled) or running as a script
 if getattr(sys, 'frozen', False):
@@ -32,31 +34,54 @@ else:
     base_path = os.path.dirname(os.path.abspath(__file__))
 
 # Global Constants
+output_lock = threading.Lock()
 LOG_FILE = os.path.join(base_path, 'UFEDKMLstacker.log')
 MERGED_KML_FILE = os.path.join(base_path, 'Merged_Colored.kml')
+MAX_KML_FILES = 10  # Maximum number of KML files that can be merged
 MAP_HEIGHT = 1080
 MAP_WIDTH = 1920
-MAX_KML_FILES = 10  # Maximum number of KML files that can be merged
 
-def configure_logging():
+# Global Color Map
+color_name_map = {
+    "#FF0000": "Red", "#0000FF": "Blue", "#FFFF00": "Yellow",
+    "#00FF00": "Green", "#FFA500": "Orange", "#EE82EE": "Violet",
+    "#FFC0CB": "Pink", "#800080": "Purple", "#40E0D0": "Turquoise", "#00FFFF": "Cyan"
+}
+
+# Spinner Funktion
+def spinner(stop_event, task_name, lock):
+    spinner_cycle = itertools.cycle(['-', '/', '-', '\\'])
+    while not stop_event.is_set():
+        with lock:
+            sys.stdout.write(f'\rProcessing {task_name} ... {next(spinner_cycle)}')
+            sys.stdout.flush()
+        time.sleep(0.1)
+
+def configure_logging(log_to_console=False):
     """
     Configure logging to log to both the console and a file with rotation.
-    The console will only show WARNING level and above, while the log file will capture DEBUG level and above.
+    The console will only show ERROR level and above, while the log file will capture DEBUG level and above.
+
+    Args:
+        log_to_console (bool): If True, log messages will also be shown in the console. Otherwise, only in the log file.
     """
     log_file_path = os.path.join(base_path, 'UFEDKMLstacker.log')
-
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.WARNING)  # Show only WARNING level and above in console
 
     file_handler = RotatingFileHandler(log_file_path, maxBytes=15*1024*1024, backupCount=3)
     file_handler.setLevel(logging.DEBUG)  # Log DEBUG level and above to file
 
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-
-    console_handler.setFormatter(formatter)
     file_handler.setFormatter(formatter)
 
-    logging.basicConfig(level=logging.DEBUG, handlers=[file_handler, console_handler])
+    handlers = [file_handler]
+
+    if log_to_console:
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.ERROR)  # Show only ERROR level and above in console
+        console_handler.setFormatter(formatter)
+        handlers.append(console_handler)
+
+    logging.basicConfig(level=logging.DEBUG, handlers=handlers)
     logging.info("Logging configured successfully with rotation.")
 
 def clear_screen():
@@ -69,7 +94,7 @@ def print_blank_line():
 
 def print_header():
     """Prints the script header for the main menu display."""
-    print(" UFEDKMLstacker v0.0.2 by ot2i7ba ")
+    print(" UFEDKMLstacker v0.0.3 by ot2i7ba ")
     print("==================================")
     print_blank_line()
 
@@ -233,7 +258,10 @@ def select_kml_files(kml_files):
     while True:
         selections = input("Enter file numbers to merge (e.g., 1, 2, 5) or 'e' to exit: ").strip().lower()
         if selections == 'e':
+            
+            print_blank_line()
             print("Exiting the script. Goodbye!")
+            print("Please review the log files and results and verify them against the source data!")
             logging.info("User chose to exit the script.")
             sys.exit(0)
         if not selections:
@@ -364,10 +392,25 @@ def parse_timestamp(timestamp_str):
         logging.error(f"Arrow failed to parse {timestamp_str}: {e}")
 
     regex_patterns = [
-        r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{6}\+\d{2}:\d{2}$',
-        r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\+\d{2}:\d{2}$',
-        r'^\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2}\(UTC\+\d{1,2}\)$',
-        r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3,6}\+\d{2}:\d{2}$'
+        r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{6}\+\d{2}:\d{2}$',   # Example: 2023-08-29 12:34:56.123456+02:00
+        r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\+\d{2}:\d{2}$',          # example: 2023-08-29 12:34:56+02:00
+        r'^\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2}\(UTC\+\d{1,2}\)$',     # example: 29.08.2023 12:34:56(UTC+2)
+        r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$',                # example: 2023-08-29T12:34:56.123Z
+        r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$',                      # example: 2023-08-29T12:34:56Z
+        r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$',                       # example: 2023-08-29T12:34:56
+        r'^\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2}$',                       # example: 29-08-2023 12:34:56
+        r'^\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}$',                       # example: 29/08/2023 12:34:56
+        r'^\d{2}/\d{2}/\d{4}$',                                         # example: 29/08/2023
+        r'^\d{4}/\d{2}/\d{2}$',                                         # example: 2023/08/29
+        r'^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}$',                       # example: 2023/08/29 12:34:56
+        r'^\d{4}\.\d{2}\.\d{2} \d{2}:\d{2}:\d{2}$',                     # example: 2023.08.29 12:34:56
+        r'^\d{4}\.\d{2}\.\d{2}$',                                       # example: 2023.08.29
+        r'^\d{4}-\d{2}-\d{2}$',                                         # example: 2023-08-29
+        r'^\d{4}-\d{2}$',                                               # example: 2023-08
+        r'^\d{2} [A-Za-z]{3} \d{4} \d{2}:\d{2}:\d{2}$',                 # example: 29 Aug 2023 12:34:56
+        r'^\d{2} [A-Za-z]{3} \d{4}$',                                   # example: 29 Aug 2023
+        r'^[A-Za-z]{3} \d{2}, \d{4}$',                                  # example: Aug 29, 2023
+        r'^[A-Za-z]{3} \d{2}, \d{4} \d{2}:\d{2}:\d{2} \w{2}$'           # example: Aug 29, 2023 12:34:56 PM
     ]
 
     for pattern in regex_patterns:
@@ -450,58 +493,82 @@ def process_kml_file(file_path, remark):
         remark (str): User-defined remark for the file.
 
     Returns:
-        tuple: Total points, points with timestamps, and a list of valid points.
+        tuple: Total points, points with timestamps, points without timestamps, and a list of valid points.
     """
+
+    # Get the base name of the file to display
+    file_name = os.path.basename(file_path)
+
+    # Start Spinner
+    stop_event = threading.Event()
+    spinner_thread = threading.Thread(target=spinner, args=(stop_event, file_name, output_lock))
+    spinner_thread.start()
+
     total_points = 0
     points_with_timestamps = 0
+    points_without_timestamps = 0
     valid_points = []
 
     try:
+        # Iterate through all Placemark elements in the KML file
         for event, elem in etree.iterparse(file_path, events=('end',), tag='{http://www.opengis.net/kml/2.2}Placemark'):
+            total_points += 1  # Count each Placemark as a point
+
+            # Extract name and description for each Placemark
             name = elem.findtext('{http://www.opengis.net/kml/2.2}name', default='')
             name = f"({remark}) - {name}"
 
             description = elem.findtext('{http://www.opengis.net/kml/2.2}description', default='')
             description_text = clean_html_tags(description)
 
+            # Initialize timestamp and source tracking
             timestamp_elem = elem.find('{http://www.opengis.net/kml/2.2}TimeStamp')
             timestamp = None
             timestamp_source = None
 
+            # Try to extract timestamp from <TimeStamp> element
             if timestamp_elem is not None:
                 when = timestamp_elem.findtext('{http://www.opengis.net/kml/2.2}when')
                 if when:
                     timestamp = parse_timestamp(when)
                     timestamp_source = "<TimeStamp>"
 
+            # If no timestamp in <TimeStamp>, check <name> and <description>
             if not timestamp:
-                if 'UTC' in name:
-                    timestamp = parse_timestamp(name)
+                timestamp = parse_timestamp(name)
+                if timestamp:
                     timestamp_source = "<name>"
-                elif 'UTC' in description_text:
+                else:
                     timestamp = parse_timestamp(description_text)
-                    timestamp_source = "<description>"
+                    if timestamp:
+                        timestamp_source = "<description>"
 
             if timestamp:
                 points_with_timestamps += 1
+            else:
+                points_without_timestamps += 1
 
+            # Extract coordinates
             coordinates_elem = elem.find('.//{http://www.opengis.net/kml/2.2}coordinates')
             if coordinates_elem is not None:
                 coords = coordinates_elem.text.strip().split(',')
-                if len(coords) >= 2:
+                if len(coords) >= 2 and timestamp:  # Ensure coordinates and timestamp are present
                     lon, lat = float(coords[0]), float(coords[1])
                     valid_points.append({
-                        "lon": lon, "lat": lat, "timestamp": timestamp,
-                        "name": name, "description": description_text
+                        "lon": lon, 
+                        "lat": lat, 
+                        "timestamp": timestamp,
+                        "name": name, 
+                        "description": description_text
                     })
-                    total_points += 1
 
-            elem.clear()
+            elem.clear()  # Free memory by clearing the element
 
+            # Log information about the processed or skipped point
             if timestamp_source:
                 logging.info(f"Geopoint processed: Name='{name}', Timestamp='{timestamp}', Source='{timestamp_source}', Coordinates={coords}")
             else:
-                logging.info(f"Geopoint processed: Name='{name}', No valid timestamp found, Coordinates={coords}")
+                logging.info(f"Geopoint skipped: Name='{name}', No valid timestamp found, Coordinates={coords}")
 
     except etree.XMLSyntaxError as e:
         logging.error(f"XML Syntax Error in file {file_path}: {e}")
@@ -510,8 +577,17 @@ def process_kml_file(file_path, remark):
     except Exception as e:
         logging.error(f"Unhandled error in file {file_path}: {e}")
 
-    logging.info(f"File {file_path} processed: {total_points} points found, {points_with_timestamps} with timestamps.")
-    return total_points, points_with_timestamps, valid_points
+    finally:
+        # Stop Spinner
+        stop_event.set()
+        spinner_thread.join()
+        sys.stdout.write(f'\rProcessing {file_name} ... done!\n')
+        sys.stdout.flush()
+
+    # Log the results of processing the file
+    logging.info(f"File {file_path} processed: {total_points} points found, {points_with_timestamps} with timestamps, {points_without_timestamps} without timestamps.")
+    
+    return total_points, points_with_timestamps, points_without_timestamps, valid_points
 
 def merge_kml_files(files, color_map, remarks, statistics):
     """
@@ -536,7 +612,10 @@ def merge_kml_files(files, color_map, remarks, statistics):
     file_metadata = {file: extract_file_metadata(os.path.join(base_path, file)) for file in files}
 
     for file in files:
-        total_points, points_with_timestamps, valid_points = process_kml_file(os.path.join(base_path, file), remarks[file])
+        # Expect four values from process_kml_file
+        total_points, points_with_timestamps, points_without_timestamps, valid_points = process_kml_file(
+            os.path.join(base_path, file), remarks[file])
+
         if validate_file_path(file):
             remark = remarks[file]
             color = color_map[file]
@@ -546,8 +625,9 @@ def merge_kml_files(files, color_map, remarks, statistics):
                 "file": file,
                 "total_points": total_points,
                 "points_with_timestamps": points_with_timestamps,
+                "points_without_timestamps": points_without_timestamps,
                 "valid_points": len(valid_points),
-                "mapped_points": len(valid_points),
+                "mapped_points": len(valid_points),  # Use the number of valid points for mapped points
                 "remark": remark,
                 "color": color,
                 **file_metadata[file]
@@ -631,17 +711,19 @@ def save_statistics_to_excel(statistics, total_valid_points, total_mapped_points
         "#00FF00": "Green", "#FFA500": "Orange", "#EE82EE": "Violet",
         "#FFC0CB": "Pink", "#800080": "Purple", "#40E0D0": "Turquoise", "#00FFFF": "Cyan"
     }
-    
+
     for stat in statistics:
         stat['color_name'] = color_name_map.get(stat['color'], "Unknown")
+        stat['points_without_timestamps'] = stat['total_points'] - stat['points_with_timestamps']
+        stat['mapped_points'] = stat['points_with_timestamps']  # Only valid points with timestamps are mapped
 
     df = pd.DataFrame(statistics)
 
-    columns_order = ['file', 'total_points', 'points_with_timestamps', 'valid_points', 
-                     'mapped_points', 'remark', 'color', 'color_name', 'creation_time', 
-                     'modification_time', 'file_size', 'sha256']
+    columns_order = ['file', 'total_points', 'points_with_timestamps', 'points_without_timestamps',
+                     'valid_points', 'mapped_points', 'remark', 'color', 'color_name', 
+                     'creation_time', 'modification_time', 'file_size', 'sha256']
     df = df[columns_order]
-    
+
     excel_file = os.path.join(base_path, 'KML_Statistics.xlsx')
     with pd.ExcelWriter(excel_file) as writer:
         df.to_excel(writer, sheet_name='Summary', index=False)
@@ -651,22 +733,34 @@ def save_statistics_to_excel(statistics, total_valid_points, total_mapped_points
         }
         summary_df = pd.DataFrame(summary_data)
         summary_df.to_excel(writer, sheet_name='Total Summary', index=False)
-    
+
     logging.info(f"Statistics saved in {excel_file}.")
     print_blank_line()
     print(f"Statistics saved in {excel_file}.")
 
-def save_statistics_to_csv(statistics: List[Dict[str, any]], filename: str = 'KML_Statistics.csv') -> None:
+def save_statistics_to_csv(statistics, total_valid_points, total_mapped_points, filename='KML_Statistics.csv'):
     """
     Saves the gathered statistics to a CSV file.
 
     Args:
         statistics (list): List of statistics dictionaries for each KML file.
+        total_valid_points (int): Total number of valid points processed.
+        total_mapped_points (int): Total number of mapped points processed.
         filename (str): The name of the CSV file to save the statistics to.
     """
+    for stat in statistics:
+        stat['color_name'] = color_name_map.get(stat['color'], "Unknown")
+        stat['points_without_timestamps'] = stat['total_points'] - stat['points_with_timestamps']
+        stat['mapped_points'] = stat['points_with_timestamps']  # Only valid points with timestamps are mapped
+
     csv_file = os.path.join(base_path, filename)
     df = pd.DataFrame(statistics)
+    columns_order = ['file', 'total_points', 'points_with_timestamps', 'points_without_timestamps',
+                     'valid_points', 'mapped_points', 'remark', 'color', 'color_name', 
+                     'creation_time', 'modification_time', 'file_size', 'sha256']
+    df = df[columns_order]
     df.to_csv(csv_file, index=False)
+
     logging.info(f"Statistics saved in {csv_file}.")
     print(f"Statistics saved in {csv_file}.")
 
@@ -697,22 +791,28 @@ def main_menu():
 
             color_map = assign_colors_to_files(selected_files)
             remarks = get_remarks(selected_files)
+
+            print_blank_line()
+
             statistics = []
             merged_kml, total_valid_points = merge_kml_files(selected_files, color_map, remarks, statistics)
 
             total_mapped_points = sum(stat["valid_points"] for stat in statistics)
 
             create_interactive_map(merged_kml, color_map, remarks)
-            
+
             save_statistics_to_excel(statistics, total_valid_points, total_mapped_points)
-            save_statistics_to_csv(statistics)
+            save_statistics_to_csv(statistics, total_valid_points, total_mapped_points)
 
             print_blank_line()
             print("Process completed successfully. Details are available in the log, Excel file, and CSV file.")
+            print("Please review the log files and results and verify them against the source data!")
             display_countdown(3)
 
     except KeyboardInterrupt:
+        print_blank_line()
         print("\nProcess interrupted by user. Exiting gracefully...")
+        print("Please review the log files and results and verify them against the source data!")
         logging.info("Process interrupted by user with CTRL+C. Exiting gracefully.")
         sys.exit(0)
 
@@ -721,6 +821,9 @@ if __name__ == "__main__":
     try:
         main_menu()
     except KeyboardInterrupt:
+
+        print_blank_line()
         print("\nProcess interrupted by user. Exiting gracefully...")
+        print("Please review the log files and results and verify them against the source data!")
         logging.info("Process interrupted by user with CTRL+C at main entry point. Exiting gracefully.")
         sys.exit(0)

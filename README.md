@@ -4,7 +4,7 @@ UFEDKMLstacker is a Python script designed to merge and visualize KML files expo
 > [!NOTE]
 > This script is specifically tailored for KML files exported from Cellebrite UFED. Its compatibility or performance with KML files from other sources has not been tested.
 
-> [!CAUTION]
+> [!WARNING]
 Please note that this script is currently under development, and I cannot provide a 100% guarantee that it operates in a forensically sound manner. It is tailored to meet specific needs at this stage. Use it with caution, especially in environments where forensic integrity is critical.
 
 ## Table of Contents
@@ -15,7 +15,6 @@ Please note that this script is currently under development, and I cannot provid
    - [PyInstaller](#pyinstaller)
    - [Releases](#releases)
 - [Example](#example)
-   - [Screenshots](#screenshots)
 - [Changes](#changes)
 - [License](#license)
 
@@ -88,6 +87,8 @@ To compile the UFEDKMLmerge script into a standalone executable, you can use PyI
 ## Releases
 A compiled and 7zip-packed version of UFEDKMLstacker for Windows is available as a release. You can download it from the **[Releases](https://github.com/ot2i7ba/UFEDKMLstacker/releases)** section on GitHub. This version includes all necessary dependencies and can be run without requiring Python to be installed on your system.
 
+Please note that console logging (log_to_console=False) is set to False in compiled version. This means that log outputs will be written to a file rather than displayed in the console.
+
 > [!IMPORTANT]
 > An internet connection is required to display the maps in the generated HTML files. This is because the maps are rendered using Plotly, which relies on online resources to load the map tiles and other visualization components. Rest assured, no information from your local system is sent to Plotly during this process. The map data is sourced from OpenStreetMap [^3], ensuring compliance with GDPR regulations.
 
@@ -106,9 +107,13 @@ A compiled and 7zip-packed version of UFEDKMLstacker for Windows is available as
 
 ## After selecting files, the script prompts for remarks
    ```sh
-   Enter a remark for the file Example1.kml:
-   Enter a remark for the file Example2.kml:
-   Enter a remark for the file Example3.kml:
+   Enter a remark for the file Example1.kml: Alpha
+   Enter a remark for the file Example2.kml: Bravo
+   Enter a remark for the file Example3.kml: Charlie
+
+   Processing Example1.kml ... done!
+   Processing Example2.kml ... done!
+   Processing Example3.kml ... done!
    ```
 
 ## The interactive map is then generated and saved
@@ -123,6 +128,15 @@ ___
 
 # Changes
 
+## Changes in 0.0.3
+
+- **Global Color Mapping Definition**<br>The color mapping (color_name_map) has been moved to a global scope, making it accessible throughout the script without needing to redefine it locally within functions.
+- **Enhanced Logging Configuration**<br>The configure_logging() function now includes an optional log_to_console parameter, allowing users to control whether log messages are shown in the console. By default, this parameter is set to True, showing only ERROR level messages in the console while logging all levels to the log file.
+- **Extended Timestamp Parsing**<br>Additional regular expression patterns have been added to the parse_timestamp() function to handle a wider range of timestamp formats, improving the robustness and versatility of timestamp parsing.
+- **Corrected Statistics Calculation**<br>The calculation of statistics has been corrected to ensure all values are counted accurately. This includes proper counting of total points, points with timestamps, and points without timestamps, enhancing the reliability of the reported data.
+- **New Statistic Metric**<br>A new metric, points_without_timestamps, has been added to the statistics. This metric tracks the number of geopoints that do not have associated timestamps, providing more detailed insights into the data.
+- **Spinner Animation During Processing**<br>A spinner animation has been introduced to provide visual feedback during the processing of KML files. The spinner shows the current file being processed and stops once processing is complete, improving user experience by indicating ongoing activity.
+
 ## Changes in 0.0.2
 
 - **Synchronous Processing**<br>The script has been updated from asynchronous to synchronous processing to enhance compatibility and reliability. The use of asyncio and aiofiles has been removed.
@@ -132,8 +146,6 @@ ___
 - **Extended Timestamp Processing**<br>The timestamp parsing has been extended to support more formats, ensuring that various timestamp formats can be recognized and parsed correctly.
 - **Saving Statistics**<br>Separate Excel and CSV files (KML_Statistic.xlsx and KML_Statistic.csv) have been introduced to store detailed statistics about the processed KML files. This adds an extra layer of control and documentation, complementing the existing Merged_Colored files.
 - **Logging Configuration**<br>Logging settings have been optimized to provide a logical separation between console and file logging. Console logging now only displays messages at the WARNING level and above, while detailed debug information is still recorded in the log file.
-
-These changes improve the script's usability, robustness, and traceability, providing more comprehensive tools for the forensic analysis of geospatial data.
 
 ## Changes in 0.0.1
 - Initial release.
