@@ -160,9 +160,8 @@ Contributions are welcome! Please fork the repository and submit a pull request 
 This project is provided without warranties. Users are advised to review the accompanying license for more information on the terms of use and limitations of liability.
 
 # Conclusion
-This script has been tailored to fit my specific professional needs, and while it may seem like a small tool, it has a significant impact on my workflow. This script is designed to aid forensic professionals in visualizing and analyzing location data extracted from multiple sources. By automating the merging and visualization process, UFEDKMLstacker enhances efficiency, allowing users to focus on critical analysis. Greetings to my dear colleagues [^4] who avoid scripts like the plague and think that consoles and Bash are some sort of dark magic – the [compiled](https://github.com/ot2i7ba/UFEDKMLstacker/releases) version will spare you the console kung-fu and hopefully be a helpful tool for you as well. 😉
+This script has been tailored to fit my specific professional needs, and while it may seem like a small tool, it has a significant impact on my workflow. This script is designed to aid forensic professionals in visualizing and analyzing location data extracted from multiple sources. By automating the merging and visualization process, UFEDKMLstacker enhances efficiency, allowing users to focus on critical analysis. Greetings to my dear colleagues who avoid scripts like the plague and think that consoles and Bash are some sort of dark magic – the [compiled](https://github.com/ot2i7ba/UFEDKMLstacker/releases) version will spare you the console kung-fu and hopefully be a helpful tool for you as well. 😉
 
 [^1]: [Cellebrite UFED](https://cellebrite.com/) (Universal Forensic Extraction Device) is a forensic tool to extract and analyze data from mobile devices.
 [^2]: Thanks to the [Plotly](https://plotly.com/python/) team for their excellent visualization library, which made creating interactive maps a breeze.
 [^3]: [OpenStreetMap](https://www.openstreetmap.org/) is a collaborative mapping project that provides freely accessible map data.
-[^4]: Greetings to PPHA-IuK.
